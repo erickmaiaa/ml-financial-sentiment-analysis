@@ -1,0 +1,32 @@
+# Default configuration for the financial sentiment pipelines.
+# Override any value via environment variables (FIN_ prefix) or by passing
+# --config <file> to the CLI scripts.
+
+random_seed: 42
+output_dir: outputs
+
+data:
+  data_path: notebooks/data.csv   # relative paths resolve against the repo root
+  text_column: Sentence
+  label_column: Sentiment
+  drop_duplicates: true
+
+ml:
+  test_size: 0.25
+  tfidf_min_df: 0.00002
+  tfidf_max_df: 0.70
+  use_idf: true
+
+transformer:
+  model_checkpoint: roberta-base
+  model_path: outputs/roberta-finetuned
+  num_labels: 3
+  max_length: 128
+  test_size: 0.1
+  validation_size: 0.2
+  train_batch_size: 32
+  eval_batch_size: 32
+  epochs: 5
+  lr: 0.00003
+  adam_epsilon: 0.00000001
+  num_warmup_steps: 10

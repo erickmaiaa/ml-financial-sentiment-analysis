@@ -1,0 +1,34 @@
+# Full dependency set for the project: classical ML baseline, text
+# preprocessing, configuration, EDA, the RoBERTa transformer stack and the
+# test suite. Install everything with:
+#
+#   pip install -r requirements.txt
+#
+# Note: torch / transformers (and occasionally others) may not yet publish
+# wheels for the very newest CPython. If installation fails, use a supported
+# interpreter (Python 3.10-3.12). The equivalent extras are also declared in
+# pyproject.toml (pip install -e ".[boosting,transformers,dev]").
+
+# --- Core (ML baseline, preprocessing, config, EDA) ---
+numpy>=1.24
+pandas>=2.0
+scikit-learn>=1.3
+nltk>=3.8
+emoji>=2.10
+pydantic>=2.5
+pydantic-settings>=2.1
+pyyaml>=6.0
+matplotlib>=3.7
+seaborn>=0.13
+
+# --- Transformer fine-tuning stack (RoBERTa) ---
+torch>=2.1
+transformers>=4.38
+accelerate>=0.27
+datasets>=2.16
+evaluate>=0.4
+ml-collections>=0.1.1
+
+# --- Gradient-boosting models ---
+xgboost>=2.0
+lightgbm>=4.0
