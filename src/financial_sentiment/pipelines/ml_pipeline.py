@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+import joblib
 import pandas as pd
 
 from financial_sentiment.config import Settings, load_settings
@@ -17,7 +18,12 @@ from financial_sentiment.data import load_dataset
 from financial_sentiment.data.loader import LABEL_COLUMN
 from financial_sentiment.evaluation import plot_model_accuracies, results_to_frame
 from financial_sentiment.features import build_tfidf_vectorizer
-from financial_sentiment.models import ModelResult, build_classifiers, train_and_evaluate
+from financial_sentiment.models import (
+    ModelResult,
+    build_classifiers,
+    save_models,
+    train_and_evaluate,
+)
 from financial_sentiment.preprocessing import TextCleaner
 from financial_sentiment.utils import get_logger, set_global_seed
 
@@ -64,6 +70,7 @@ def run(settings: Settings) -> list[ModelResult]:
     results = train_and_evaluate(classifiers, x_train_tf, y_train, x_test_tf, y_test)
 
     _persist(results, settings.output_dir)
+    _persist_models(classifiers, vectorizer, settings.output_dir)
     return results
 
 
@@ -74,6 +81,22 @@ def _persist(results: list[ModelResult], output_dir: Path) -> None:
     frame.to_csv(csv_path, index=False)
     logger.info("Wrote ML results to %s", csv_path)
     plot_model_accuracies(frame, save_path=output_dir / "ml_accuracies.png")
+
+
+def _persist_models(classifiers, vectorizer, output_dir: Path) -> None:
+    """Serialise the fitted TF-IDF vectoriser and classifiers with joblib.
+
+    Artefacts land in ``<output_dir>/models/`` so they can be reloaded for
+    inference (``joblib.load``) without retraining.
+    """
+    models_dir = output_dir / "models"
+    models_dir.mkdir(parents=True, exist_ok=True)
+
+    vectorizer_path = models_dir / "tfidf_vectorizer.joblib"
+    joblib.dump(vectorizer, vectorizer_path)
+    logger.info("Saved TF-IDF vectoriser -> %s", vectorizer_path)
+
+    save_models(classifiers, models_dir)
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:

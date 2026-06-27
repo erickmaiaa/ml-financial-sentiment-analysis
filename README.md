@@ -32,7 +32,7 @@ ingestion → preprocessing → feature engineering → training → evaluation 
 ```
 ml-financial-sentiment-analysis/
 ├── notebooks/
-│   ├── financial_sentiment.ipynb     # Thin orchestrator notebook
+│   ├── main.ipynb     # Thin orchestrator notebook
 │   └── data.csv                      # Raw dataset (Sentence, Sentiment)
 ├── src/financial_sentiment/
 │   ├── config/        # Centralised, validated settings (pydantic + YAML + .env)
@@ -47,7 +47,8 @@ ml-financial-sentiment-analysis/
 ├── configs/           # default.yaml
 ├── scripts/           # run_ml.py / run_transformer.py
 ├── docs/              # Refactoring report
-├── outputs/           # Generated models, tables and figures (git-ignored)
+├── outputs/           # Generated artefacts (git-ignored)
+│   └── models/        # joblib-serialised TF-IDF vectoriser + trained classifiers
 ├── pyproject.toml
 └── requirements.txt
 ```
@@ -89,7 +90,8 @@ Copy `.env.example` to `.env` to override any setting via environment variables.
 ### Command line
 
 ```bash
-# Classical ML baseline (writes outputs/ml_results.csv and a bar chart)
+# Classical ML baseline (writes outputs/ml_results.csv, a bar chart and the
+# fitted vectoriser + classifiers under outputs/models/)
 python scripts/run_ml.py --config configs/default.yaml
 
 # Fine-tune RoBERTa (GPU recommended)
@@ -110,7 +112,7 @@ results = run(settings)        # list[ModelResult] ranked by accuracy
 
 ### Notebook
 
-Open [`notebooks/financial_sentiment.ipynb`](notebooks/financial_sentiment.ipynb)
+Open [`notebooks/main.ipynb`](notebooks/main.ipynb)
 — it imports the package and orchestrates the full experiment end to end.
 
 ## Pipeline details
@@ -124,6 +126,28 @@ Open [`notebooks/financial_sentiment.ipynb`](notebooks/financial_sentiment.ipynb
 | ML models | `models.ml` | RF, GB, AdaBoost, Decision Tree, SVM, Naive Bayes, MLP (+ XGBoost/LightGBM if installed) |
 | Transformer | `models.transformer.TransformerTrainer` | RoBERTa fine-tuning with Accelerate; saves model to `outputs/` |
 | Evaluation | `evaluation.plots` | Ranked accuracy table + bar chart |
+| Persistence | `models.save_models` | joblib-dumps the fitted vectoriser + each classifier to `outputs/models/` |
+
+## Saved models
+
+Running the ML pipeline serialises every fitted artefact with
+[joblib](https://joblib.readthedocs.io/) into `outputs/models/`:
+
+- `tfidf_vectorizer.joblib` — the fitted TF-IDF vectoriser
+- one `<model_name>.joblib` per trained classifier (e.g. `random_forest.joblib`)
+
+Reload them for inference without retraining — apply the **same** vectoriser
+that was fitted during training before predicting:
+
+```python
+import joblib
+
+vectorizer = joblib.load("outputs/models/tfidf_vectorizer.joblib")
+model = joblib.load("outputs/models/random_forest.joblib")
+
+features = vectorizer.transform(["the company beat earnings expectations"])
+print(model.predict(features))   # encoded sentiment label
+```
 
 ## Configuration
 

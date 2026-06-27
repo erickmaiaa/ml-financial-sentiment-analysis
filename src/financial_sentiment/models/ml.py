@@ -7,8 +7,12 @@ imported lazily so the module remains importable without them.
 
 from __future__ import annotations
 
+import re
+import warnings
 from dataclasses import dataclass
+from pathlib import Path
 
+import joblib
 from sklearn.base import ClassifierMixin
 from sklearn.ensemble import (
     AdaBoostClassifier,
@@ -52,7 +56,7 @@ def build_classifiers(random_seed: int = 42) -> dict[str, ClassifierMixin]:
         "Decision Tree": DecisionTreeClassifier(random_state=random_seed),
         "Support Vector Machine": SVC(random_state=random_seed),
         "Naive Bayes": MultinomialNB(),
-        "Multilayer Perceptron": MLPClassifier(random_state=random_seed),
+        "Multilayer Perceptron": MLPClassifier(random_state=random_seed, max_iter=1000),
     }
 
     try:
@@ -97,11 +101,57 @@ def train_and_evaluate(
     for name, clf in classifiers.items():
         logger.info("Training %s ...", name)
         clf.fit(x_train, y_train)
-        accuracy = float(accuracy_score(y_test, clf.predict(x_test)))
+        with warnings.catch_warnings():
+            # LightGBM auto-names features ("Column_0", ...) when fitted on the
+            # unnamed sparse TF-IDF matrix, so predicting on an equally unnamed
+            # matrix triggers a benign feature-name mismatch warning. We train
+            # and predict on the same format, so suppress that specific notice.
+            warnings.filterwarnings(
+                "ignore",
+                message="X does not have valid feature names",
+                category=UserWarning,
+            )
+            predictions = clf.predict(x_test)
+        accuracy = float(accuracy_score(y_test, predictions))
         logger.info("%s accuracy: %.4f", name, accuracy)
         results.append(ModelResult(name=name, accuracy=accuracy))
 
     return sorted(results, key=lambda r: r.accuracy, reverse=True)
 
 
-__all__ = ["ModelResult", "build_classifiers", "train_and_evaluate"]
+def _slugify(name: str) -> str:
+    """Turn a human-readable model name into a safe filename stem."""
+    return re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
+
+
+def save_models(
+    classifiers: dict[str, ClassifierMixin],
+    output_dir: str | Path,
+) -> dict[str, Path]:
+    """Persist each fitted classifier to disk with joblib.
+
+    Each estimator is written to ``<output_dir>/<slug>.joblib`` so it can be
+    reloaded later with :func:`joblib.load` for inference without retraining.
+
+    Args:
+        classifiers: Mapping of name to a *fitted* estimator.
+        output_dir: Directory to write the ``.joblib`` files into; created if
+            it does not yet exist.
+
+    Returns:
+        Mapping of model name to the path it was written to.
+    """
+    directory = Path(output_dir)
+    directory.mkdir(parents=True, exist_ok=True)
+
+    paths: dict[str, Path] = {}
+    for name, clf in classifiers.items():
+        path = directory / f"{_slugify(name)}.joblib"
+        joblib.dump(clf, path)
+        logger.info("Saved %s -> %s", name, path)
+        paths[name] = path
+
+    return paths
+
+
+__all__ = ["ModelResult", "build_classifiers", "train_and_evaluate", "save_models"]

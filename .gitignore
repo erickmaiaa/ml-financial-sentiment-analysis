@@ -22,8 +22,7 @@ dist/
 *.egg-info/
 
 # Project outputs (models, reports, figures)
-outputs/
-!outputs/.gitkeep
+/outputs/
 
 # Trained model / tokenizer artifacts
 *.h5
